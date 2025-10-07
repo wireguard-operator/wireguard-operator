@@ -115,6 +115,9 @@ var _ = BeforeSuite(func() {
 	err = SetupWireGuardPeerWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = SetupWireGuardTrafficFlowWebhookWithManager(mgr)
+	Expect(err).NotTo(HaveOccurred())
+
 	// +kubebuilder:scaffold:webhook
 
 	go func() {
