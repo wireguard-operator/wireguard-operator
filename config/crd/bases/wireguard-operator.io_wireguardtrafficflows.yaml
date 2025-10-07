@@ -1,0 +1,1117 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: wireguardtrafficflows.wireguard-operator.io
+spec:
+  group: wireguard-operator.io
+  names:
+    kind: WireGuardTrafficFlow
+    listKind: WireGuardTrafficFlowList
+    plural: wireguardtrafficflows
+    shortNames:
+    - wgflow
+    singular: wireguardtrafficflow
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.filterRuleCount
+      name: Filter Rules
+      type: integer
+    - jsonPath: .status.natRuleCount
+      name: NAT Rules
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          WireGuardTrafficFlow is the Schema for unified traffic flow configuration.
+
+          Examples:
+          - DNS server: to.self + interfaces=["wg0"]
+          - Multus routing: from.interfaces=["net1"] to.interfaces=["wg0"] + masquerade
+          - Port forwarding: DNAT with explicit target
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: WireGuardTrafficFlowSpec defines traffic flows with unified
+              filter and NAT operations.
+            properties:
+              flows:
+                description: |-
+                  Flows define individual traffic flow rules.
+                  Each flow describes a complete traffic pattern including source, destination,
+                  filtering action, and optional NAT transformation.
+                  Flows are evaluated in array order within this resource.
+                  Use multiple flows for different protocols, IP families, or NAT requirements.
+                items:
+                  description: |-
+                    FlowRule defines a single traffic flow with source, destination, filtering, and optional NAT.
+                    The flow-based pattern makes network configuration more intuitive by describing traffic
+                    in natural language: "Traffic flows from A to B with optional transformation C".
+                  properties:
+                    filter:
+                      description: |-
+                        Filter defines the filtering action for this flow.
+                        Determines whether traffic is allowed, dropped, or rejected.
+                        Can include logging, rate limiting, and connection tracking.
+                        If not specified, traffic matching this flow is allowed by default.
+                      properties:
+                        action:
+                          description: |-
+                            Action determines what happens to matching packets:
+                            - Allow: Accept the packet (NFTables 'accept')
+                            - Drop: Silently discard the packet (NFTables 'drop')
+                            - Reject: Drop with ICMP/TCP RST response (NFTables 'reject')
+                          enum:
+                          - Allow
+                          - Drop
+                          - Reject
+                          type: string
+                        log:
+                          default: false
+                          description: |-
+                            Log enables packet logging for this flow.
+                            Logged packets appear in kernel log (dmesg/journald) with the specified prefix.
+                            Use sparingly as excessive logging impacts performance.
+                            Logs include packet counters for traffic analysis.
+                          type: boolean
+                        logPrefix:
+                          description: |-
+                            LogPrefix adds a custom prefix to log messages.
+                            Useful for distinguishing between different flows in logs.
+                            If not specified, defaults to "flow:<name>".
+                            Maximum length: 63 characters
+                          maxLength: 63
+                          type: string
+                        rateLimit:
+                          description: |-
+                            RateLimit applies rate limiting to this flow using token bucket algorithm.
+                            Only valid with action=Allow. Excess packets are dropped.
+                            Useful for DDoS protection and bandwidth management.
+                            Can be applied globally, per-source, or per-destination.
+                          properties:
+                            burst:
+                              default: 5
+                              description: |-
+                                Burst specifies the maximum tokens that can accumulate in the bucket.
+                                Allows temporary traffic spikes above the rate limit.
+                                Set to 0 for strict rate limiting without burst allowance.
+                                Default of 5 provides reasonable burst tolerance.
+                              format: int32
+                              minimum: 0
+                              type: integer
+                            bytes:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                Bytes specifies the maximum data volume allowed per time unit.
+                                Mutually exclusive with Packets. Use for bandwidth-based rate limiting.
+                                Examples:
+                                - "10Mi" = 10 mebibytes
+                                - "1Gi" = 1 gibibyte
+                                - "100M" = 100 megabytes
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            over:
+                              default: false
+                              description: |-
+                                Over inverts the rate limit match logic.
+                                When false (default): Match packets within the rate limit.
+                                When true: Match packets that exceed the rate limit (useful for logging or dropping excess traffic).
+                              type: boolean
+                            packets:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                Packets specifies the maximum number of packets allowed per time unit.
+                                Mutually exclusive with Bytes. Use for connection-oriented rate limiting.
+                                Examples:
+                                - "100" = 100 packets
+                                - "1k" = 1,000 packets
+                                - "10k" = 10,000 packets
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            per:
+                              description: |-
+                                Per defines the time unit for the rate limit.
+                                The limit resets after each time period.
+                                Options: second, minute, hour, day, week
+                              enum:
+                              - second
+                              - minute
+                              - hour
+                              - day
+                              - week
+                              type: string
+                            scope:
+                              default: global
+                              description: |-
+                                Scope defines how the rate limit is applied:
+                                - global: Single limit shared by all traffic
+                                - per-source: Separate limit for each source IP address
+                                - per-destination: Separate limit for each destination IP address
+                                Use per-source to prevent single IPs from consuming all bandwidth.
+                              enum:
+                              - global
+                              - per-source
+                              - per-destination
+                              type: string
+                          required:
+                          - per
+                          type: object
+                          x-kubernetes-validations:
+                          - message: exactly one of packets or bytes must be set
+                            rule: (has(self.packets) && !has(self.bytes)) || (!has(self.packets)
+                              && has(self.bytes))
+                      type: object
+                    from:
+                      description: |-
+                        From identifies the traffic source for this flow.
+                        Can specify pods, peers, IPs, interfaces, or use 'self' for traffic from this pod.
+                        If not specified, matches traffic from any source.
+                        The 'self' field enables intuitive pod-centric rules:
+                        - from.self=true → Traffic FROM this pod (OUTPUT chain)
+                      properties:
+                        interfaces:
+                          description: |-
+                            Interfaces matches traffic on specific network interfaces.
+                            Can be combined with self for interface-specific pod rules.
+                            Examples: ["wg0", "eth0", "net1"]
+
+                            Semantics:
+                            - In 'from' selector: iifname (input interface)
+                            - In 'to' selector: oifname (output interface)
+
+                            Use cases:
+                            - DNS only via WireGuard: to.self=true, interfaces=["wg0"]
+                            - Multus to WireGuard: from.interfaces=["net1"], to.interfaces=["wg0"]
+                          items:
+                            description: InterfaceName is a network interface name.
+                            maxLength: 15
+                            pattern: ^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,14}$
+                            type: string
+                          maxItems: 20
+                          type: array
+                          x-kubernetes-list-type: set
+                        ipBlocks:
+                          description: |-
+                            IPBlocks matches traffic by IP address ranges.
+                            Supports CIDR notation, IP ranges, and single IPs for both IPv4 and IPv6.
+                            Examples: ["10.0.0.0/8", "192.168.1.0/24", "2001:db8::/32"]
+                            Mutually exclusive with podSelector, peerSelector, serviceSelector when self=true.
+                          items:
+                            type: string
+                          maxItems: 100
+                          type: array
+                          x-kubernetes-list-type: set
+                        multusNetwork:
+                          description: |-
+                            MultusNetwork specifies which Multus NetworkAttachmentDefinition to use
+                            when resolving podSelector IPs. Only IPs from this network are included.
+
+                            The annotation k8s.v1.cni.cncf.io/network-status is parsed to find the
+                            network by name. Format: "name" (same namespace) or "namespace/name".
+
+                            Example: podSelector matches pods with net1 (10.219.2.22) and eth0 (10.44.0.25)
+                              multusNetwork: "kube-system/wireguard-routed"
+                              → Resolves only 10.219.2.22 (net1), ignores 10.44.0.25 (eth0)
+
+                            Only valid when podSelector is specified.
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(/[a-z0-9]([-a-z0-9]*[a-z0-9])?)?$
+                          type: string
+                        peerSelector:
+                          description: |-
+                            PeerSelector matches WireGuardPeer resources by labels.
+                            Useful for creating rules that apply to specific peer groups.
+                            The matched peers' AllowedIPs are used for rule generation.
+                            Example: Allow traffic from all peers with label wireguard-location=office
+                            Mutually exclusive with ipBlocks, podSelector, serviceSelector when self=true.
+                          properties:
+                            matchExpressions:
+                              description: matchExpressions is a list of label selector
+                                requirements. The requirements are ANDed.
+                              items:
+                                description: |-
+                                  A label selector requirement is a selector that contains values, a key, and an operator that
+                                  relates the key and values.
+                                properties:
+                                  key:
+                                    description: key is the label key that the selector
+                                      applies to.
+                                    type: string
+                                  operator:
+                                    description: |-
+                                      operator represents a key's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists and DoesNotExist.
+                                    type: string
+                                  values:
+                                    description: |-
+                                      values is an array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty. This array is replaced during a strategic
+                                      merge patch.
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                required:
+                                - key
+                                - operator
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            matchLabels:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                operator is "In", and the values array contains only "value". The requirements are ANDed.
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        podSelector:
+                          description: |-
+                            PodSelector matches Kubernetes pods by labels.
+                            The selector is evaluated in the same namespace as this resource.
+                            Matched pods' IPs are dynamically updated as pods come and go.
+                            Useful for allowing traffic between specific application tiers.
+                            Mutually exclusive with ipBlocks, peerSelector, serviceSelector when self=true.
+                          properties:
+                            matchExpressions:
+                              description: matchExpressions is a list of label selector
+                                requirements. The requirements are ANDed.
+                              items:
+                                description: |-
+                                  A label selector requirement is a selector that contains values, a key, and an operator that
+                                  relates the key and values.
+                                properties:
+                                  key:
+                                    description: key is the label key that the selector
+                                      applies to.
+                                    type: string
+                                  operator:
+                                    description: |-
+                                      operator represents a key's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists and DoesNotExist.
+                                    type: string
+                                  values:
+                                    description: |-
+                                      values is an array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty. This array is replaced during a strategic
+                                      merge patch.
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                required:
+                                - key
+                                - operator
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            matchLabels:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                operator is "In", and the values array contains only "value". The requirements are ANDed.
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        ports:
+                          description: |-
+                            Ports specifies TCP/UDP port matching criteria.
+                            Can define single ports, port ranges, or named ports.
+                            Only valid when protocol is TCP, UDP, or Any.
+                            The protocol is defined at the FlowRule level, not per port.
+                          items:
+                            description: |-
+                              PolicyPort describes TCP/UDP port matching criteria.
+                              Supports single ports, port ranges, and named ports from services.
+                            properties:
+                              endPort:
+                                description: |-
+                                  EndPort defines the inclusive end of a port range.
+                                  Must be >= Port. If not specified, only Port is matched.
+                                  Example: Port=8080, EndPort=8090 matches ports 8080-8090.
+                                format: int32
+                                maximum: 65535
+                                minimum: 1
+                                type: integer
+                              name:
+                                description: |-
+                                  Name references a named port from a service.
+                                  When ServiceSelector is used, this resolves to the actual port number.
+                                  Example: "http", "https", "grpc"
+                                type: string
+                              port:
+                                description: |-
+                                  Port specifies a single port number or start of a range.
+                                  Valid range: 1-65535
+                                format: int32
+                                maximum: 65535
+                                minimum: 1
+                                type: integer
+                            type: object
+                            x-kubernetes-validations:
+                            - message: endPort requires port
+                              rule: '!has(self.endPort) || has(self.port)'
+                            - message: endPort must be >= port
+                              rule: '!has(self.endPort) || int(self.endPort) >= int(self.port)'
+                          maxItems: 10
+                          type: array
+                        self:
+                          default: false
+                          description: |-
+                            Self indicates traffic to/from the pod itself.
+                            This is the primary selector for determining packet flow direction:
+                            - When true in 'to': Matches INPUT chain (traffic TO this pod)
+                            - When true in 'from': Matches OUTPUT chain (traffic FROM this pod)
+                            - When false/absent in both: Matches FORWARD chain (traffic THROUGH this pod)
+
+                            Self can be combined with:
+                            - interfaces: Restrict to specific network interfaces (e.g., to.self + interfaces=["wg0"])
+                            - ports: Restrict to specific ports (e.g., to.self + ports=[{port: 80}])
+
+                            Self cannot be combined with:
+                            - ipBlocks, podSelector, peerSelector, serviceSelector (mutually exclusive)
+
+                            Examples:
+                            - DNS server: to.self=true, ports=[{port: 53}], interfaces=["wg0"]
+                            - Pod egress: from.self=true, to.interfaces=["eth0"]
+                          type: boolean
+                        serviceSelector:
+                          description: |-
+                            ServiceSelector matches Kubernetes services by labels.
+                            The service's ClusterIP and endpoints are used for matching.
+                            Useful for allowing traffic to/from specific services.
+                            Mutually exclusive with ipBlocks, podSelector, peerSelector when self=true.
+                          properties:
+                            matchExpressions:
+                              description: matchExpressions is a list of label selector
+                                requirements. The requirements are ANDed.
+                              items:
+                                description: |-
+                                  A label selector requirement is a selector that contains values, a key, and an operator that
+                                  relates the key and values.
+                                properties:
+                                  key:
+                                    description: key is the label key that the selector
+                                      applies to.
+                                    type: string
+                                  operator:
+                                    description: |-
+                                      operator represents a key's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists and DoesNotExist.
+                                    type: string
+                                  values:
+                                    description: |-
+                                      values is an array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty. This array is replaced during a strategic
+                                      merge patch.
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                required:
+                                - key
+                                - operator
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            matchLabels:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                operator is "In", and the values array contains only "value". The requirements are ANDed.
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                      type: object
+                      x-kubernetes-validations:
+                      - message: when self is true, cannot specify ipBlocks, podSelector,
+                          peerSelector, or serviceSelector
+                        rule: '!has(self.self) || self.self != true || ((has(self.ipBlocks)?1:0)
+                          + (has(self.podSelector)?1:0) + (has(self.peerSelector)?1:0)
+                          + (has(self.serviceSelector)?1:0) == 0)'
+                      - message: specify at most one of ipBlocks, podSelector, peerSelector,
+                          or serviceSelector
+                        rule: ((has(self.ipBlocks) && size(self.ipBlocks) > 0)?1:0)
+                          + (has(self.podSelector)?1:0) + (has(self.peerSelector)?1:0)
+                          + (has(self.serviceSelector)?1:0) <= 1
+                      - message: multusNetwork requires podSelector to be specified
+                        rule: '!has(self.multusNetwork) || has(self.podSelector)'
+                    ipFamily:
+                      description: |-
+                        IPFamily restricts this flow to IPv4 or IPv6 traffic.
+                        This is crucial for NAT operations as NFTables requires separate tables
+                        for IPv4 (ip) and IPv6 (ip6) NAT rules.
+                        Filter rules can use inet table for dual-stack, but NAT must be family-specific.
+                      enum:
+                      - IPv4
+                      - IPv6
+                      type: string
+                    name:
+                      description: |-
+                        Name uniquely identifies this flow rule within the resource.
+                        Used for logging, status reporting, and debugging.
+                        Must be DNS-1123 compatible.
+                      maxLength: 63
+                      minLength: 1
+                      pattern: ^[a-zA-Z0-9._:+-]{1,63}$
+                      type: string
+                    protocol:
+                      description: |-
+                        Protocol specifies the network protocol for this flow.
+                        This is the single source of truth for protocol matching.
+                        Port matching is only valid with TCP, UDP, or Any.
+                        ICMP requires IPv4, ICMPv6 requires IPv6.
+                      enum:
+                      - TCP
+                      - UDP
+                      - ICMP
+                      - ICMPv6
+                      - Any
+                      type: string
+                    to:
+                      description: |-
+                        To identifies the traffic destination for this flow.
+                        Can specify pods, peers, IPs, interfaces, or use 'self' for traffic to this pod.
+                        If not specified, matches traffic to any destination.
+                        The 'self' field enables intuitive pod-centric rules:
+                        - to.self=true → Traffic TO this pod (INPUT chain)
+                      properties:
+                        interfaces:
+                          description: |-
+                            Interfaces matches traffic on specific network interfaces.
+                            Can be combined with self for interface-specific pod rules.
+                            Examples: ["wg0", "eth0", "net1"]
+
+                            Semantics:
+                            - In 'from' selector: iifname (input interface)
+                            - In 'to' selector: oifname (output interface)
+
+                            Use cases:
+                            - DNS only via WireGuard: to.self=true, interfaces=["wg0"]
+                            - Multus to WireGuard: from.interfaces=["net1"], to.interfaces=["wg0"]
+                          items:
+                            description: InterfaceName is a network interface name.
+                            maxLength: 15
+                            pattern: ^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,14}$
+                            type: string
+                          maxItems: 20
+                          type: array
+                          x-kubernetes-list-type: set
+                        ipBlocks:
+                          description: |-
+                            IPBlocks matches traffic by IP address ranges.
+                            Supports CIDR notation, IP ranges, and single IPs for both IPv4 and IPv6.
+                            Examples: ["10.0.0.0/8", "192.168.1.0/24", "2001:db8::/32"]
+                            Mutually exclusive with podSelector, peerSelector, serviceSelector when self=true.
+                          items:
+                            type: string
+                          maxItems: 100
+                          type: array
+                          x-kubernetes-list-type: set
+                        multusNetwork:
+                          description: |-
+                            MultusNetwork specifies which Multus NetworkAttachmentDefinition to use
+                            when resolving podSelector IPs. Only IPs from this network are included.
+
+                            The annotation k8s.v1.cni.cncf.io/network-status is parsed to find the
+                            network by name. Format: "name" (same namespace) or "namespace/name".
+
+                            Example: podSelector matches pods with net1 (10.219.2.22) and eth0 (10.44.0.25)
+                              multusNetwork: "kube-system/wireguard-routed"
+                              → Resolves only 10.219.2.22 (net1), ignores 10.44.0.25 (eth0)
+
+                            Only valid when podSelector is specified.
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(/[a-z0-9]([-a-z0-9]*[a-z0-9])?)?$
+                          type: string
+                        peerSelector:
+                          description: |-
+                            PeerSelector matches WireGuardPeer resources by labels.
+                            Useful for creating rules that apply to specific peer groups.
+                            The matched peers' AllowedIPs are used for rule generation.
+                            Example: Allow traffic from all peers with label wireguard-location=office
+                            Mutually exclusive with ipBlocks, podSelector, serviceSelector when self=true.
+                          properties:
+                            matchExpressions:
+                              description: matchExpressions is a list of label selector
+                                requirements. The requirements are ANDed.
+                              items:
+                                description: |-
+                                  A label selector requirement is a selector that contains values, a key, and an operator that
+                                  relates the key and values.
+                                properties:
+                                  key:
+                                    description: key is the label key that the selector
+                                      applies to.
+                                    type: string
+                                  operator:
+                                    description: |-
+                                      operator represents a key's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists and DoesNotExist.
+                                    type: string
+                                  values:
+                                    description: |-
+                                      values is an array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty. This array is replaced during a strategic
+                                      merge patch.
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                required:
+                                - key
+                                - operator
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            matchLabels:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                operator is "In", and the values array contains only "value". The requirements are ANDed.
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        podSelector:
+                          description: |-
+                            PodSelector matches Kubernetes pods by labels.
+                            The selector is evaluated in the same namespace as this resource.
+                            Matched pods' IPs are dynamically updated as pods come and go.
+                            Useful for allowing traffic between specific application tiers.
+                            Mutually exclusive with ipBlocks, peerSelector, serviceSelector when self=true.
+                          properties:
+                            matchExpressions:
+                              description: matchExpressions is a list of label selector
+                                requirements. The requirements are ANDed.
+                              items:
+                                description: |-
+                                  A label selector requirement is a selector that contains values, a key, and an operator that
+                                  relates the key and values.
+                                properties:
+                                  key:
+                                    description: key is the label key that the selector
+                                      applies to.
+                                    type: string
+                                  operator:
+                                    description: |-
+                                      operator represents a key's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists and DoesNotExist.
+                                    type: string
+                                  values:
+                                    description: |-
+                                      values is an array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty. This array is replaced during a strategic
+                                      merge patch.
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                required:
+                                - key
+                                - operator
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            matchLabels:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                operator is "In", and the values array contains only "value". The requirements are ANDed.
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        ports:
+                          description: |-
+                            Ports specifies TCP/UDP port matching criteria.
+                            Can define single ports, port ranges, or named ports.
+                            Only valid when protocol is TCP, UDP, or Any.
+                            The protocol is defined at the FlowRule level, not per port.
+                          items:
+                            description: |-
+                              PolicyPort describes TCP/UDP port matching criteria.
+                              Supports single ports, port ranges, and named ports from services.
+                            properties:
+                              endPort:
+                                description: |-
+                                  EndPort defines the inclusive end of a port range.
+                                  Must be >= Port. If not specified, only Port is matched.
+                                  Example: Port=8080, EndPort=8090 matches ports 8080-8090.
+                                format: int32
+                                maximum: 65535
+                                minimum: 1
+                                type: integer
+                              name:
+                                description: |-
+                                  Name references a named port from a service.
+                                  When ServiceSelector is used, this resolves to the actual port number.
+                                  Example: "http", "https", "grpc"
+                                type: string
+                              port:
+                                description: |-
+                                  Port specifies a single port number or start of a range.
+                                  Valid range: 1-65535
+                                format: int32
+                                maximum: 65535
+                                minimum: 1
+                                type: integer
+                            type: object
+                            x-kubernetes-validations:
+                            - message: endPort requires port
+                              rule: '!has(self.endPort) || has(self.port)'
+                            - message: endPort must be >= port
+                              rule: '!has(self.endPort) || int(self.endPort) >= int(self.port)'
+                          maxItems: 10
+                          type: array
+                        self:
+                          default: false
+                          description: |-
+                            Self indicates traffic to/from the pod itself.
+                            This is the primary selector for determining packet flow direction:
+                            - When true in 'to': Matches INPUT chain (traffic TO this pod)
+                            - When true in 'from': Matches OUTPUT chain (traffic FROM this pod)
+                            - When false/absent in both: Matches FORWARD chain (traffic THROUGH this pod)
+
+                            Self can be combined with:
+                            - interfaces: Restrict to specific network interfaces (e.g., to.self + interfaces=["wg0"])
+                            - ports: Restrict to specific ports (e.g., to.self + ports=[{port: 80}])
+
+                            Self cannot be combined with:
+                            - ipBlocks, podSelector, peerSelector, serviceSelector (mutually exclusive)
+
+                            Examples:
+                            - DNS server: to.self=true, ports=[{port: 53}], interfaces=["wg0"]
+                            - Pod egress: from.self=true, to.interfaces=["eth0"]
+                          type: boolean
+                        serviceSelector:
+                          description: |-
+                            ServiceSelector matches Kubernetes services by labels.
+                            The service's ClusterIP and endpoints are used for matching.
+                            Useful for allowing traffic to/from specific services.
+                            Mutually exclusive with ipBlocks, podSelector, peerSelector when self=true.
+                          properties:
+                            matchExpressions:
+                              description: matchExpressions is a list of label selector
+                                requirements. The requirements are ANDed.
+                              items:
+                                description: |-
+                                  A label selector requirement is a selector that contains values, a key, and an operator that
+                                  relates the key and values.
+                                properties:
+                                  key:
+                                    description: key is the label key that the selector
+                                      applies to.
+                                    type: string
+                                  operator:
+                                    description: |-
+                                      operator represents a key's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists and DoesNotExist.
+                                    type: string
+                                  values:
+                                    description: |-
+                                      values is an array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty. This array is replaced during a strategic
+                                      merge patch.
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                required:
+                                - key
+                                - operator
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            matchLabels:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                operator is "In", and the values array contains only "value". The requirements are ANDed.
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                      type: object
+                      x-kubernetes-validations:
+                      - message: when self is true, cannot specify ipBlocks, podSelector,
+                          peerSelector, or serviceSelector
+                        rule: '!has(self.self) || self.self != true || ((has(self.ipBlocks)?1:0)
+                          + (has(self.podSelector)?1:0) + (has(self.peerSelector)?1:0)
+                          + (has(self.serviceSelector)?1:0) == 0)'
+                      - message: specify at most one of ipBlocks, podSelector, peerSelector,
+                          or serviceSelector
+                        rule: ((has(self.ipBlocks) && size(self.ipBlocks) > 0)?1:0)
+                          + (has(self.podSelector)?1:0) + (has(self.peerSelector)?1:0)
+                          + (has(self.serviceSelector)?1:0) <= 1
+                      - message: multusNetwork requires podSelector to be specified
+                        rule: '!has(self.multusNetwork) || has(self.podSelector)'
+                    transform:
+                      description: |-
+                        Transform defines optional NAT transformation for this flow.
+                        Supports masquerading, SNAT, and DNAT operations.
+                        NAT is applied in addition to filtering, not instead of.
+                        Transform type determines the NAT chain automatically:
+                        - masquerade/snat → POSTROUTING chain
+                        - dnat → PREROUTING chain
+
+                        For masquerade, the interface is used as:
+                        1. Match condition: oifname "eth0" (packets going out via eth0)
+                        2. IP source: Masquerade uses eth0's IP for SNAT automatically
+
+                        Example: from.ipBlocks=["10.0.0.0/8"] to.interfaces=["eth0"] transform.type=masquerade
+                        Generates NFTables rule: ip saddr 10.0.0.0/8 oifname "eth0" masquerade
+                      properties:
+                        interface:
+                          description: |-
+                            Interface specifies the output interface for NAT operations.
+                            Used for masquerade and optionally for SNAT/DNAT.
+
+                            For masquerade:
+                            - Required (explicit or from to.interfaces[0])
+                            - Used as match condition (oifname) before masquerade action
+                            - Masquerade automatically uses this interface's IP for SNAT
+
+                            For SNAT/DNAT:
+                            - Optional: Can be used to restrict NAT to specific interface
+
+                            Resolution order for masquerade:
+                            1. Explicit transform.interface
+                            2. Implicit to.interfaces[0]
+                            3. Error if neither available
+
+                            Examples: "eth0" for main network, "wg0" for WireGuard
+                          maxLength: 15
+                          pattern: ^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,14}$
+                          type: string
+                        target:
+                          description: |-
+                            Target specifies the NAT target address.
+                            Format depends on transform type:
+                            - DNAT: "IP:Port" (e.g., "10.0.0.5:80" for port forwarding to internal service)
+                            - SNAT: "IP" (e.g., "203.0.113.1" for static outbound IP)
+                            - Masquerade: Not used (masquerade uses the matched output interface's IP automatically)
+
+                            Required for DNAT and SNAT, ignored for masquerade.
+                          pattern: ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(:[0-9]{1,5})?$|^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}(:[0-9]{1,5})?$
+                          type: string
+                        type:
+                          description: |-
+                            Type specifies the NAT operation mode.
+                            This determines which NFTables NAT chain is used:
+                            - masquerade: POSTROUTING chain, dynamic SNAT using interface IP
+                            - snat: POSTROUTING chain, static SNAT to specific IP
+                            - dnat: PREROUTING chain, destination NAT for port forwarding
+                          enum:
+                          - masquerade
+                          - snat
+                          - dnat
+                          type: string
+                      required:
+                      - type
+                      type: object
+                  type: object
+                  x-kubernetes-validations:
+                  - message: 'ICMPv6 protocol requires ipFamily: IPv6'
+                    rule: '!has(self.protocol) || self.protocol != ''ICMPv6'' || self.ipFamily
+                      == ''IPv6'''
+                  - message: 'ICMP protocol requires ipFamily: IPv4'
+                    rule: '!has(self.protocol) || self.protocol != ''ICMP'' || self.ipFamily
+                      == ''IPv4'''
+                  - message: to.ports can only be specified with TCP, UDP, or Any
+                      protocol
+                    rule: '!has(self.to) || !has(self.to.ports) || has(self.protocol)
+                      && self.protocol in [''TCP'',''UDP'',''Any'']'
+                  - message: from.ports can only be specified with TCP, UDP, or Any
+                      protocol
+                    rule: '!has(self.from) || !has(self.from.ports) || has(self.protocol)
+                      && self.protocol in [''TCP'',''UDP'',''Any'']'
+                  - message: rateLimit is only supported with filter.action=Allow
+                    rule: '!has(self.filter) || !has(self.filter.rateLimit) || self.filter.action
+                      == ''Allow'''
+                  - message: DNAT cannot be used with to.self or from.self (DNAT happens
+                      in PREROUTING before routing decision)
+                    rule: '!has(self.transform) || self.transform.type != ''dnat''
+                      || (!has(self.to) || !self.to.self) && (!has(self.from) || !self.from.self)'
+                  - message: Masquerade cannot be used with from.self (OUTPUT chain
+                      conflicts with POSTROUTING)
+                    rule: '!has(self.transform) || self.transform.type != ''masquerade''
+                      || !has(self.from) || !self.from.self'
+                  - message: SNAT cannot be used with from.self (OUTPUT chain conflicts
+                      with POSTROUTING)
+                    rule: '!has(self.transform) || self.transform.type != ''snat''
+                      || !has(self.from) || !self.from.self'
+                  - message: DNAT requires transform.target to be specified
+                    rule: '!has(self.transform) || self.transform.type != ''dnat''
+                      || has(self.transform.target)'
+                  - message: SNAT requires transform.target to be specified
+                    rule: '!has(self.transform) || self.transform.type != ''snat''
+                      || has(self.transform.target)'
+                  - message: Masquerade requires transform.interface or to.interfaces[0]
+                    rule: '!has(self.transform) || self.transform.type != ''masquerade''
+                      || has(self.transform.interface) || (has(self.to) && has(self.to.interfaces)
+                      && self.to.interfaces.size() > 0)'
+                maxItems: 50
+                type: array
+              priority:
+                default: 0
+                description: |-
+                  Priority determines the evaluation order among multiple WireGuardTrafficFlow resources.
+                  Lower values are evaluated first. This priority applies to the entire flow resource.
+                  Rules within a flow maintain their array order.
+                  Common values:
+                  - -100: High priority (evaluated early, e.g., critical security rules)
+                  - 0: Default priority
+                  - 100: Low priority (evaluated late, e.g., catch-all rules)
+                format: int32
+                maximum: 32767
+                minimum: -32768
+                type: integer
+              wireguardRef:
+                description: |-
+                  WireGuardRef identifies the WireGuard instance this resource belongs to.
+                  This reference is immutable once set to ensure a consistent configuration.
+                properties:
+                  name:
+                    description: |-
+                      Name identifies the WireGuard resource in the same namespace.
+                      This field is immutable after creation to prevent accidental reassignment.
+                      The referenced WireGuard must exist for the resource to become active.
+                    maxLength: 253
+                    minLength: 1
+                    type: string
+                    x-kubernetes-validations:
+                    - message: wireguardRef.name is immutable once set
+                      rule: self == oldSelf
+                required:
+                - name
+                type: object
+                x-kubernetes-validations:
+                - message: wireguardRef cannot be removed once set
+                  rule: '!has(oldSelf.name) || has(self.name)'
+            required:
+            - wireguardRef
+            type: object
+          status:
+            description: WireGuardTrafficFlowStatus represents the current state of
+              the traffic flow.
+            properties:
+              appliedTo:
+                description: |-
+                  AppliedTo lists all entities (pods, peers, services) affected by this flow.
+                  Shows the result of selector expansion for troubleshooting.
+                  Includes resolved IP addresses for each entity.
+                items:
+                  description: |-
+                    AppliedEntity represents a resource affected by this policy.
+                    Shows the result of selector evaluation for troubleshooting.
+                  properties:
+                    name:
+                      description: Name of the Kubernetes resource.
+                      type: string
+                    namespace:
+                      description: Namespace of the resource (empty for cluster-scoped
+                        resources).
+                      type: string
+                    resolvedIPs:
+                      description: |-
+                        ResolvedIPs shows the IP addresses this entity resolved to.
+                        For pods: Pod IP
+                        For services: ClusterIP and endpoint IPs
+                        For peers: AllowedIPs from the peer configuration
+                      items:
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: set
+                    type:
+                      description: |-
+                        Type identifies the kind of Kubernetes resource:
+                        - Pod: Kubernetes pod
+                        - Peer: WireGuardPeer resource
+                        - Service: Kubernetes service
+                      type: string
+                  required:
+                  - name
+                  - type
+                  type: object
+                type: array
+              chainAssignments:
+                description: |-
+                  ChainAssignments shows which NFTables chains each flow was assigned to.
+                  Useful for understanding the packet processing path and debugging.
+                  Each entry corresponds to one flow in the spec.
+                items:
+                  description: |-
+                    ChainAssignment shows which NFTables chains a flow rule was assigned to.
+                    This information is useful for debugging and understanding the actual packet processing path.
+                  properties:
+                    filterChain:
+                      description: |-
+                        FilterChain indicates which filter chain processes this flow:
+                        - "input": Traffic TO this pod (to.self=true)
+                        - "output": Traffic FROM this pod (from.self=true)
+                        - "forward": Traffic THROUGH this pod (neither from nor to has self=true)
+                      type: string
+                    flowName:
+                      description: FlowName identifies which flow rule this assignment
+                        belongs to.
+                      type: string
+                    natChain:
+                      description: |-
+                        NATChain indicates which NAT chain processes this flow:
+                        - "prerouting": DNAT operations (before routing decision)
+                        - "postrouting": SNAT/Masquerade operations (after routing decision)
+                        - Empty if no NAT transformation is configured
+                      type: string
+                  required:
+                  - flowName
+                  type: object
+                type: array
+              conditions:
+                description: |-
+                  Conditions provide detailed status information:
+                  - Ready: Flow is successfully applied
+                  - SelectorResolved: All selectors resolved to IPs
+                  - RulesGenerated: NFTables rules created successfully
+                  - Applied: Rules are active in the kernel
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              filterRuleCount:
+                description: |-
+                  FilterRuleCount shows how many NFTables filter rules were generated.
+                  This may be higher than the number of flows if selectors expand to multiple IPs.
+                format: int32
+                type: integer
+              natRuleCount:
+                description: |-
+                  NATRuleCount shows how many NFTables NAT rules were generated.
+                  Only flows with transform configured contribute to this count.
+                format: int32
+                type: integer
+              phase:
+                description: |-
+                  Phase indicates the lifecycle state:
+                  - Pending: Flow is being processed
+                  - Active: Flow rules are applied and enforced
+                  - Failed: Flow application encountered errors
+                enum:
+                - Pending
+                - Running
+                - Active
+                - Inactive
+                - Failed
+                type: string
+              warnings:
+                description: |-
+                  Warnings contains non-fatal issues encountered during flow processing.
+                  Examples:
+                  - Selector matched no resources
+                  - WireGuard reference not found (non-blocking)
+                  - Interface not found (falls back to default)
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    selectableFields:
+    - jsonPath: .spec.wireguardRef.name
+    served: true
+    storage: true
+    subresources:
+      status: {}
