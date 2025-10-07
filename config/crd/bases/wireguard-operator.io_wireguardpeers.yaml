@@ -1,0 +1,403 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: wireguardpeers.wireguard-operator.io
+spec:
+  group: wireguard-operator.io
+  names:
+    kind: WireGuardPeer
+    listKind: WireGuardPeerList
+    plural: wireguardpeers
+    shortNames:
+    - wgpeer
+    singular: wireguardpeer
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.endpoint
+      name: Endpoint
+      type: string
+    - jsonPath: .spec.publicKey
+      name: PublicKey
+      type: string
+    - jsonPath: .spec.allowedIPs[0]
+      name: AllowedIPs
+      type: string
+    - jsonPath: .status.lastHandshakeTime
+      name: LastHandshake
+      type: date
+    - jsonPath: .status.transferBytes.receiveHumanReadable
+      name: Receive
+      type: string
+    - jsonPath: .status.transferBytes.transmitHumanReadable
+      name: Transmit
+      type: string
+    - jsonPath: .status.transferBytes.totalHumanReadable
+      name: Total
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          WireGuardPeer represents a remote WireGuard endpoint configuration.
+          Peers can be other sites (site-to-site VPN) or individual clients (road warriors).
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              WireGuardPeerSpec defines a WireGuard peer configuration.
+              Peers represent remote WireGuard endpoints that can connect to this instance.
+              Each peer has a unique public key and set of allowed IP ranges.
+            properties:
+              allowedIPs:
+                description: |-
+                  AllowedIPs defines which IP ranges this peer can use as source.
+                  Acts as both routing table entries and access control.
+                  If not specified, an IP will be automatically assigned from the WireGuard's address range.
+                  Examples: ["10.0.1.2/32"] for single host, ["10.0.2.0/24"] for subnet.
+                  For site-to-site: Use the remote site's network ranges.
+                  For road warriors: Typically a single /32 address per peer (auto-assigned if omitted).
+                items:
+                  type: string
+                maxItems: 100
+                type: array
+                x-kubernetes-list-type: set
+              configAllowedIPs:
+                description: |-
+                  ConfigAllowedIPs adds extra AllowedIPs only to the generated config file.
+                  These IPs are NOT added as kernel routes on the server side.
+                  Use cases:
+                  - Client-side routing for split tunneling
+                  - Including default route (0.0.0.0/0) for full tunnel configs
+                  - Adding routes the client needs but server doesn't route
+                items:
+                  type: string
+                maxItems: 100
+                type: array
+                x-kubernetes-list-type: set
+              configSecretRef:
+                description: |-
+                  ConfigSecretRef specifies where to store the generated WireGuard config.
+                  The operator creates/updates a secret with a complete wg.conf file.
+                  This config can be used by WireGuard clients for connection.
+                  If not set but peer has no publicKey, defaults to "<peer-name>-config".
+                  The secret will contain:
+                  - wg.conf: Complete WireGuard configuration
+                  - privateKey: The peer's private key (if auto-generated)
+                properties:
+                  key:
+                    default: wg.conf
+                    description: |-
+                      Key specifies the data key within the Secret that contains the configuration file.
+                      Defaults to "wg.conf" if not specified.
+                    maxLength: 253
+                    type: string
+                  name:
+                    description: |-
+                      Name specifies the name of the Kubernetes Secret resource.
+                      The secret must exist in the same namespace as the referencing resource.
+                    maxLength: 253
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              endpoint:
+                description: |-
+                  Endpoint specifies how to reach this peer.
+                  Format: "<hostname-or-ip>:<port>"
+                  Examples: "vpn.example.com:51820", "203.0.113.1:51820"
+                  If not set, peer must initiate the connection (common for road warriors).
+                  Supports both static IPs and DNS names (resolved periodically).
+                type: string
+              generateConfig:
+                default: false
+                description: |-
+                  GenerateConfig controls whether to generate a WireGuard configuration file.
+                  When true, a config secret will be created/maintained even if keys are provided externally.
+                  If privateKey is not available, placeholder text will be used in the config.
+                  The config secret name defaults to "<peer-name>-config" unless ConfigSecretRef is set.
+                type: boolean
+              mtu:
+                description: |-
+                  Mtu sets the Maximum Transmission Unit for this peer connection.
+                  If specified, overrides the interface MTU for this peer's traffic.
+                  Useful when peer is behind a connection with lower MTU.
+                maximum: 9000
+                minimum: 68
+                type: integer
+              peerSelector:
+                description: |-
+                  PeerSelector includes additional peers in the generated config.
+                  Selected WireGuardPeer resources are added as [Peer] sections.
+                  Useful for mesh networks where peers need to know about each other.
+                  The selector is evaluated in the same namespace.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
+              persistentKeepalive:
+                description: |-
+                  PersistentKeepalive sends keepalive packets every N seconds.
+                  Keeps NAT mappings and firewall states alive.
+                  Common values:
+                  - 0: Disabled (default) - for stable connections
+                  - 25: Recommended for NAT traversal
+                  - 10-60: Range for different NAT timeout scenarios
+                format: int32
+                maximum: 65535
+                minimum: 0
+                type: integer
+              presharedKeySecret:
+                description: |-
+                  PresharedKeySecret adds an additional layer of symmetric encryption.
+                  Optional but recommended for quantum-resistant security.
+                  The secret must contain a base64-encoded 32-byte key.
+                  Generate with: wg genpsk
+                properties:
+                  key:
+                    default: presharedKey
+                    description: |-
+                      Key specifies the data key within the Secret that contains the preshared key.
+                      Defaults to "presharedKey" if not specified.
+                      The value must be base64-encoded in the Secret data field.
+                    maxLength: 253
+                    type: string
+                  name:
+                    description: |-
+                      Name specifies the name of the Kubernetes Secret resource.
+                      The secret must exist in the same namespace as the referencing resource.
+                    maxLength: 253
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              publicKey:
+                description: |-
+                  PublicKey identifies this peer uniquely in WireGuard.
+                  Base64-encoded 32-byte key generated by wg genkey/pubkey.
+                  This field is immutable once set to prevent connection disruption.
+                  If not provided, operator can auto-generate a key pair.
+                pattern: ^[A-Za-z0-9+/]{43}=$
+                type: string
+                x-kubernetes-validations:
+                - message: publicKey is immutable once set
+                  rule: self == oldSelf
+              wireguardRef:
+                description: |-
+                  WireGuardRef identifies the WireGuard instance this resource belongs to.
+                  This reference is immutable once set to ensure a consistent configuration.
+                properties:
+                  name:
+                    description: |-
+                      Name identifies the WireGuard resource in the same namespace.
+                      This field is immutable after creation to prevent accidental reassignment.
+                      The referenced WireGuard must exist for the resource to become active.
+                    maxLength: 253
+                    minLength: 1
+                    type: string
+                    x-kubernetes-validations:
+                    - message: wireguardRef.name is immutable once set
+                      rule: self == oldSelf
+                required:
+                - name
+                type: object
+                x-kubernetes-validations:
+                - message: wireguardRef cannot be removed once set
+                  rule: '!has(oldSelf.name) || has(self.name)'
+            required:
+            - wireguardRef
+            type: object
+          status:
+            description: WireGuardPeerStatus represents the current state and statistics
+              of the peer.
+            properties:
+              conditions:
+                description: |-
+                  Conditions provide detailed status information:
+                  - Ready: Peer is configured in WireGuard
+                  - EndpointResolved: Endpoint hostname resolved successfully
+                  - ConfigSecretCreated: Config secret generated (if requested)
+                  - Reachable: Recent handshake indicates peer is online
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastHandshakeTime:
+                description: |-
+                  LastHandshakeTime shows when this peer last authenticated.
+                  Updated after successful WireGuard handshake.
+                  If never connected or stale (>180s), peer may be unreachable.
+                format: date-time
+                type: string
+              phase:
+                description: |-
+                  Phase indicates the peer's current state:
+                  - Pending: Peer is being configured
+                  - Active: Peer is configured and can connect
+                  - Failed: Configuration error occurred
+                enum:
+                - Pending
+                - Running
+                - Active
+                - Inactive
+                - Failed
+                type: string
+              transferBytes:
+                description: |-
+                  TransferBytes tracks bandwidth usage for this peer.
+                  Updated periodically from WireGuard statistics.
+                  Useful for monitoring peer activity and data consumption.
+                properties:
+                  receiveHumanReadable:
+                    description: ReceiveHumanReadable shows received bytes in human
+                      format (e.g., "1.5 GiB").
+                    type: string
+                  received:
+                    description: Received is the total bytes received from this peer.
+                    format: int64
+                    type: integer
+                  sent:
+                    description: Sent is the total bytes sent to this peer.
+                    format: int64
+                    type: integer
+                  totalHumanReadable:
+                    description: TotalHumanReadable shows total transfer in human
+                      format (e.g., "3.8 GiB").
+                    type: string
+                  transmitHumanReadable:
+                    description: TransmitHumanReadable shows sent bytes in human format
+                      (e.g., "2.3 GiB").
+                    type: string
+                required:
+                - receiveHumanReadable
+                - received
+                - sent
+                - totalHumanReadable
+                - transmitHumanReadable
+                type: object
+            type: object
+        type: object
+    selectableFields:
+    - jsonPath: .spec.wireguardRef.name
+    served: true
+    storage: true
+    subresources:
+      status: {}
