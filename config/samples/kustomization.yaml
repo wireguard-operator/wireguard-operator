@@ -2,4 +2,6 @@
 resources:
 - v1alpha1_wireguard.yaml
 - _v1alpha1_wireguard.yaml
+- v1alpha1_wireguardpeer.yaml
+- _v1alpha1_wireguardpeer.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

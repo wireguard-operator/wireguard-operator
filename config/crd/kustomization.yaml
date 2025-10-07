@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/wireguard-operator.io_wireguards.yaml
+- bases/wireguard-operator.io_wireguardpeers.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

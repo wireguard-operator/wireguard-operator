@@ -22,6 +22,9 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the wireguard-operator itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- wireguardpeer_admin_role.yaml
+- wireguardpeer_editor_role.yaml
+- wireguardpeer_viewer_role.yaml
 - wireguard_admin_role.yaml
 - wireguard_editor_role.yaml
 - wireguard_viewer_role.yaml
