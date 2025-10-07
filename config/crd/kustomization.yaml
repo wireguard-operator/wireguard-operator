@@ -4,6 +4,7 @@
 resources:
 - bases/wireguard-operator.io_wireguards.yaml
 - bases/wireguard-operator.io_wireguardpeers.yaml
+- bases/wireguard-operator.io_wireguardtrafficflows.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:
