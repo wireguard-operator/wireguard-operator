@@ -1,9 +1,0 @@
-apiVersion: wireguard-operator.io/v1alpha1
-kind: WireGuardPeer
-metadata:
-  labels:
-    app.kubernetes.io/name: wireguard-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: wireguardpeer-sample
-spec:
-  # TODO(user): Add fields here

@@ -29,7 +29,6 @@ import (
 	wireguardoperatoriov1alpha1 "github.com/wireguard-operator/wireguard-operator/api/v1alpha1"
 )
 
-// nolint:unused
 // log is for logging in this package.
 var wireguardlog = logf.Log.WithName("wireguard-resource")
 

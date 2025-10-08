@@ -2,6 +2,8 @@ name: Tests
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 jobs:
@@ -21,3 +23,6 @@ jobs:
         run: |
           go mod tidy
           make test
+
+      - name: Running helm unit
+        run:  make helm-test

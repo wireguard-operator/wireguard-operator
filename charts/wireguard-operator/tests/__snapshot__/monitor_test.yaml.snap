@@ -1,0 +1,23 @@
+should render a ServiceMonitor manifests with defaults:
+  1: |
+    apiVersion: monitoring.coreos.com/v1
+    kind: ServiceMonitor
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: wireguard-operator
+        app.kubernetes.io/version: v0.0.0
+        helm.sh/chart: wireguard-operator-0.0.0
+      name: RELEASE-NAME-wireguard-operator
+    spec:
+      endpoints:
+        - port: metric
+          scheme: http
+      namespaceSelector:
+        matchNames:
+          - NAMESPACE
+      selector:
+        matchLabels:
+          app.kubernetes.io/instance: RELEASE-NAME
+          app.kubernetes.io/name: wireguard-operator

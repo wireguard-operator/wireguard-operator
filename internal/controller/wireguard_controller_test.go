@@ -51,7 +51,11 @@ var _ = Describe("WireGuard Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: wireguardoperatoriov1alpha1.WireGuardSpec{
+						Addresses: []wireguardoperatoriov1alpha1.InterfaceAddress{
+							wireguardoperatoriov1alpha1.MustParseInterfaceAddress("10.0.0.1/24"),
+						},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

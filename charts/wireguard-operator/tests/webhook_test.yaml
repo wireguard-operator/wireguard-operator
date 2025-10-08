@@ -1,0 +1,81 @@
+suite: Webhook configuration
+templates:
+  - webhook/certificate.yaml
+  - webhook/issuer.yaml
+  - webhook/webhook.yaml
+  - service.yaml
+tests:
+  - it: should render webhook related manifests
+    set:
+      admissionWebhooks:
+        certManager:
+          enabled: true
+    asserts:
+      - isKind:
+          of: Certificate
+        template: webhook/certificate.yaml
+      - isKind:
+          of: Issuer
+        template: webhook/issuer.yaml
+      - isKind:
+          of: ValidatingWebhookConfiguration
+        template: webhook/webhook.yaml
+
+
+      - lengthEqual:
+          path: webhooks
+          count: 3
+        template: webhook/webhook.yaml
+
+      - isKind:
+          of: Service
+        template: service.yaml
+      - equal:
+          path: spec.ports[0].name
+          value: webhook
+        template: service.yaml
+      - equal:
+          path: spec.ports[0].port
+          value: 9443
+        template: service.yaml
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 9443
+        template: service.yaml
+
+  - it: should not render webhook manifest when admissionWebhooks is disabled
+    set:
+      admissionWebhooks:
+        enabled: false
+        certManager:
+          enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should use provided issuer
+    set:
+      admissionWebhooks:
+        certManager:
+          enabled: true
+          issuer:
+            name: my-issuer
+            group: cert-manager.io/v1
+            kind: ClusterIssuer
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: webhook/issuer.yaml
+
+      - equal:
+          path: spec.issuerRef.name
+          value:  my-issuer
+        template: webhook/certificate.yaml
+      - equal:
+          path: spec.issuerRef.group
+          value:  cert-manager.io/v1
+        template: webhook/certificate.yaml
+      - equal:
+          path: spec.issuerRef.kind
+          value:  ClusterIssuer
+        template: webhook/certificate.yaml

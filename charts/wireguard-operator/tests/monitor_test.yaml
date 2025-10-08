@@ -1,0 +1,53 @@
+suite: Monitoring configuration
+templates:
+  - monitor.yaml
+tests:
+  - it: should provide no monitoring by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render a ServiceMonitor manifests with defaults
+    set:
+      serviceMonitor:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - matchSnapshot: {}
+
+  - it: should render a ServiceMonitor with annotations
+    set:
+      serviceMonitor:
+        enabled: true
+        annotations:
+          foo: bar
+          k8s.io/templated-value: '{{ include "wireguard-operator.name" . }}'
+    asserts:
+      - equal:
+          path: metadata.annotations
+          value:
+            foo: bar
+            k8s.io/templated-value: wireguard-operator
+
+  - it: should render a ServiceMonitor with annotations
+    set:
+      serviceMonitor:
+        enabled: true
+        relabelings:
+          - action: dropequal
+            regex: ".*"
+        interval: 5s
+        scrapeTimeout: 1s
+    asserts:
+      - equal:
+          path: spec.endpoints[0].relabelings
+          value:
+            - action: dropequal
+              regex: ".*"
+      - equal:
+          path: spec.endpoints[0].interval
+          value: 5s
+      - equal:
+          path: spec.endpoints[0].scrapeTimeout
+          value: 1s

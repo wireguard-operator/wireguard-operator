@@ -1,0 +1,30 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "wireguard-operator.fullname" . }}
+  labels:
+    {{- include "wireguard-operator.labels" . | nindent 4 }}
+  {{- with .Values.serviceMonitor.annotations }}
+  annotations:
+    {{- tpl (toYaml . ) $ | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels: {{ include "wireguard-operator.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: metric
+      scheme: http
+      {{- with .Values.serviceMonitor.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.relabelings }}
+      relabelings: {{ toYaml . | nindent 8 }}
+      {{- end }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+{{- end }}

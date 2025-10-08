@@ -1,0 +1,51 @@
+suite: extra objects
+release:
+  name: wireguard-operator
+templates:
+  - extra-objects.yaml
+tests:
+  - it: should provide nothing by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should provide a way to add templated documents
+    set:
+      extraObjects:
+        - |
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: {{ include "wireguard-operator.fullname" . }}-sec
+          data:
+            fooBar:  {{ "hello-world" | b64enc }}
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: {{ include "wireguard-operator.fullname" . }}-cm
+          data:
+            foo: "bar"
+    asserts:
+      - hasDocuments:
+          count: 2
+
+      - isKind:
+          of: Secret
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: wireguard-operator-sec
+        documentIndex: 0
+      - equal:
+          path: data.fooBar
+          value: aGVsbG8td29ybGQ=
+        documentIndex: 0
+
+      - isKind:
+          of: ConfigMap
+        documentIndex: 1
+      - equal:
+          path: metadata.name
+          value: wireguard-operator-cm
+        documentIndex: 1
