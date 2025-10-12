@@ -83,6 +83,15 @@ spec:
                   For site-to-site: Use the remote site's network ranges.
                   For road warriors: Typically a single /32 address per peer (auto-assigned if omitted).
                 items:
+                  description: |-
+                    IPBlock represents an IP address, CIDR, or segment range as a string.
+                    Supports:
+                      - Single IP: "192.168.1.1" or "2001:db8::1"
+                      - CIDR: "192.168.0.0/24" or "2001:db8::/32"
+                      - Segment Range: "192.168.1.1-5" or "2001:db8::1-a" (only last segment)
+
+                    Full-address ranges like "10.0.0.1-10.0.0.33" are NOT supported.
+                    Use CIDR notation or multiple entries instead.
                   type: string
                 maxItems: 100
                 type: array
@@ -96,6 +105,15 @@ spec:
                   - Including default route (0.0.0.0/0) for full tunnel configs
                   - Adding routes the client needs but server doesn't route
                 items:
+                  description: |-
+                    IPBlock represents an IP address, CIDR, or segment range as a string.
+                    Supports:
+                      - Single IP: "192.168.1.1" or "2001:db8::1"
+                      - CIDR: "192.168.0.0/24" or "2001:db8::/32"
+                      - Segment Range: "192.168.1.1-5" or "2001:db8::1-a" (only last segment)
+
+                    Full-address ranges like "10.0.0.1-10.0.0.33" are NOT supported.
+                    Use CIDR notation or multiple entries instead.
                   type: string
                 maxItems: 100
                 type: array

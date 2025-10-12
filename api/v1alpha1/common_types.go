@@ -25,7 +25,7 @@ import (
 // +kubebuilder:validation:Maximum=65535
 
 // Port is a network port number.
-type Port int32
+type Port uint16
 
 // +kubebuilder:validation:Type=integer
 // +kubebuilder:validation:Minimum=68
@@ -218,25 +218,6 @@ const (
 	RateLimitScopePerDestination RateLimitScope = "per-destination"
 )
 
-// +kubebuilder:validation:Enum=new;established;related;invalid;untracked
-
-// ConnTrackState defines connection tracking states for stateful firewall rules.
-// Connection tracking (conntrack) enables stateful packet filtering in NFTables.
-type ConnTrackState string
-
-const (
-	// ConnTrackStateNew matches packets creating a new connection (SYN packets for TCP).
-	ConnTrackStateNew ConnTrackState = "new"
-	// ConnTrackStateEstablished matches packets belonging to established connections.
-	ConnTrackStateEstablished ConnTrackState = "established"
-	// ConnTrackStateRelated matches packets related to existing connections (e.g., ICMP errors, FTP data).
-	ConnTrackStateRelated ConnTrackState = "related"
-	// ConnTrackStateInvalid matches packets that don't match any connection or violate protocol rules.
-	ConnTrackStateInvalid ConnTrackState = "invalid"
-	// ConnTrackStateUntracked matches packets explicitly excluded from connection tracking.
-	ConnTrackStateUntracked ConnTrackState = "untracked"
-)
-
 // +kubebuilder:validation:Enum=IPv4;IPv6
 // +kubebuilder:default=IPv4
 
@@ -309,3 +290,33 @@ type RateLimitSpec struct {
 	// Use per-source to prevent single IPs from consuming all bandwidth.
 	Scope RateLimitScope `json:"scope,omitempty"`
 }
+
+// +kubebuilder:validation:Type=string
+
+// IPBlock represents an IP address, CIDR, or segment range as a string.
+// Supports:
+//   - Single IP: "192.168.1.1" or "2001:db8::1"
+//   - CIDR: "192.168.0.0/24" or "2001:db8::/32"
+//   - Segment Range: "192.168.1.1-5" or "2001:db8::1-a" (only last segment)
+//
+// Full-address ranges like "10.0.0.1-10.0.0.33" are NOT supported.
+// Use CIDR notation or multiple entries instead.
+type IPBlock string
+
+// +kubebuilder:validation:MaxItems=100
+// +listType=set
+
+// IPBlocks is a list of IPBlock blocks
+type IPBlocks []IPBlock
+
+// +kubebuilder:validation:Type=string
+
+// InterfaceCIDR represents an IP address with subnet mask for network interfaces
+// It wraps net.IPNet and marshals to a single CIDR string like "192.168.1.1/24"
+// Unlike routes, interface addresses use specific host IPs (not network addresses)
+type InterfaceCIDR string
+
+// InterfaceCIDRs is a slice of InterfaceCIDR
+// +kubebuilder:validation:MaxItems=100
+// +listType=set
+type InterfaceCIDRs []InterfaceCIDR

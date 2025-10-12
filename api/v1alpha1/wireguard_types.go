@@ -54,7 +54,7 @@ type WireGuardSpec struct {
 	// - "10.219.3.1/24" for IPv4 VPN network
 	// - "fd00::1/64" for IPv6 VPN network
 	// Multiple addresses can be specified for dual-stack configurations.
-	Addresses InterfaceAddresses `json:"addresses"`
+	Addresses InterfaceCIDRs `json:"addresses"`
 
 	// +optional
 	// +kubebuilder:validation:MaxItems=10

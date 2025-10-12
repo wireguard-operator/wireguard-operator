@@ -62,8 +62,14 @@ spec:
                   - "fd00::1/64" for IPv6 VPN network
                   Multiple addresses can be specified for dual-stack configurations.
                 items:
+                  description: |-
+                    InterfaceCIDR represents an IP address with subnet mask for network interfaces
+                    It wraps net.IPNet and marshals to a single CIDR string like "192.168.1.1/24"
+                    Unlike routes, interface addresses use specific host IPs (not network addresses)
                   type: string
+                maxItems: 100
                 type: array
+                x-kubernetes-list-type: set
               dns:
                 description: |-
                   Dns specifies DNS configuration to be pushed to WireGuard peers.
@@ -110,7 +116,6 @@ spec:
                   ListenPort specifies the UDP port WireGuard will listen on for incoming connections.
                   Peers must connect to this port to establish the VPN tunnel.
                   Common values: 51820 (default)
-                format: int32
                 maximum: 65535
                 minimum: 1
                 type: integer

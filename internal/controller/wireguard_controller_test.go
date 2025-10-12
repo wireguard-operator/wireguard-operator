@@ -52,8 +52,8 @@ var _ = Describe("WireGuard Controller", func() {
 						Namespace: "default",
 					},
 					Spec: wireguardoperatoriov1alpha1.WireGuardSpec{
-						Addresses: []wireguardoperatoriov1alpha1.InterfaceAddress{
-							wireguardoperatoriov1alpha1.MustParseInterfaceAddress("10.0.0.1/24"),
+						Addresses: []wireguardoperatoriov1alpha1.InterfaceCIDR{
+							"10.0.0.1/24",
 						},
 					},
 				}

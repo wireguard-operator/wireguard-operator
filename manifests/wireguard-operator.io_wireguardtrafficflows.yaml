@@ -227,6 +227,15 @@ spec:
                             Examples: ["10.0.0.0/8", "192.168.1.0/24", "2001:db8::/32"]
                             Mutually exclusive with podSelector, peerSelector, serviceSelector when self=true.
                           items:
+                            description: |-
+                              IPBlock represents an IP address, CIDR, or segment range as a string.
+                              Supports:
+                                - Single IP: "192.168.1.1" or "2001:db8::1"
+                                - CIDR: "192.168.0.0/24" or "2001:db8::/32"
+                                - Segment Range: "192.168.1.1-5" or "2001:db8::1-a" (only last segment)
+
+                              Full-address ranges like "10.0.0.1-10.0.0.33" are NOT supported.
+                              Use CIDR notation or multiple entries instead.
                             type: string
                           maxItems: 100
                           type: array
@@ -364,7 +373,6 @@ spec:
                                   EndPort defines the inclusive end of a port range.
                                   Must be >= Port. If not specified, only Port is matched.
                                   Example: Port=8080, EndPort=8090 matches ports 8080-8090.
-                                format: int32
                                 maximum: 65535
                                 minimum: 1
                                 type: integer
@@ -378,7 +386,6 @@ spec:
                                 description: |-
                                   Port specifies a single port number or start of a range.
                                   Valid range: 1-65535
-                                format: int32
                                 maximum: 65535
                                 minimum: 1
                                 type: integer
@@ -542,6 +549,15 @@ spec:
                             Examples: ["10.0.0.0/8", "192.168.1.0/24", "2001:db8::/32"]
                             Mutually exclusive with podSelector, peerSelector, serviceSelector when self=true.
                           items:
+                            description: |-
+                              IPBlock represents an IP address, CIDR, or segment range as a string.
+                              Supports:
+                                - Single IP: "192.168.1.1" or "2001:db8::1"
+                                - CIDR: "192.168.0.0/24" or "2001:db8::/32"
+                                - Segment Range: "192.168.1.1-5" or "2001:db8::1-a" (only last segment)
+
+                              Full-address ranges like "10.0.0.1-10.0.0.33" are NOT supported.
+                              Use CIDR notation or multiple entries instead.
                             type: string
                           maxItems: 100
                           type: array
@@ -679,7 +695,6 @@ spec:
                                   EndPort defines the inclusive end of a port range.
                                   Must be >= Port. If not specified, only Port is matched.
                                   Example: Port=8080, EndPort=8090 matches ports 8080-8090.
-                                format: int32
                                 maximum: 65535
                                 minimum: 1
                                 type: integer
@@ -693,7 +708,6 @@ spec:
                                 description: |-
                                   Port specifies a single port number or start of a range.
                                   Valid range: 1-65535
-                                format: int32
                                 maximum: 65535
                                 minimum: 1
                                 type: integer
@@ -792,15 +806,15 @@ spec:
                     transform:
                       description: |-
                         Transform defines optional NAT transformation for this flow.
-                        Supports masquerading, SNAT, and DNAT operations.
+                        Supports masquerading and DNAT operations.
                         NAT is applied in addition to filtering, not instead of.
                         Transform type determines the NAT chain automatically:
-                        - masquerade/snat → POSTROUTING chain
+                        - masquerade → POSTROUTING chain
                         - dnat → PREROUTING chain
 
                         For masquerade, the interface is used as:
                         1. Match condition: oifname "eth0" (packets going out via eth0)
-                        2. IP source: Masquerade uses eth0's IP for SNAT automatically
+                        2. IP source: Masquerade uses eth0's IP automatically
 
                         Example: from.ipBlocks=["10.0.0.0/8"] to.interfaces=["eth0"] transform.type=masquerade
                         Generates NFTables rule: ip saddr 10.0.0.0/8 oifname "eth0" masquerade
@@ -808,14 +822,14 @@ spec:
                         interface:
                           description: |-
                             Interface specifies the output interface for NAT operations.
-                            Used for masquerade and optionally for SNAT/DNAT.
+                            Used for masquerade and optionally for DNAT.
 
                             For masquerade:
                             - Required (explicit or from to.interfaces[0])
                             - Used as match condition (oifname) before masquerade action
-                            - Masquerade automatically uses this interface's IP for SNAT
+                            - Masquerade automatically uses this interface's IP for source NAT
 
-                            For SNAT/DNAT:
+                            For DNAT:
                             - Optional: Can be used to restrict NAT to specific interface
 
                             Resolution order for masquerade:
@@ -832,22 +846,19 @@ spec:
                             Target specifies the NAT target address.
                             Format depends on transform type:
                             - DNAT: "IP:Port" (e.g., "10.0.0.5:80" for port forwarding to internal service)
-                            - SNAT: "IP" (e.g., "203.0.113.1" for static outbound IP)
                             - Masquerade: Not used (masquerade uses the matched output interface's IP automatically)
 
-                            Required for DNAT and SNAT, ignored for masquerade.
+                            Required for DNAT, ignored for masquerade.
                           pattern: ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(:[0-9]{1,5})?$|^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}(:[0-9]{1,5})?$
                           type: string
                         type:
                           description: |-
                             Type specifies the NAT operation mode.
                             This determines which NFTables NAT chain is used:
-                            - masquerade: POSTROUTING chain, dynamic SNAT using interface IP
-                            - snat: POSTROUTING chain, static SNAT to specific IP
+                            - masquerade: POSTROUTING chain, dynamic source NAT using interface IP
                             - dnat: PREROUTING chain, destination NAT for port forwarding
                           enum:
                           - masquerade
-                          - snat
                           - dnat
                           type: string
                       required:
@@ -880,15 +891,8 @@ spec:
                       conflicts with POSTROUTING)
                     rule: '!has(self.transform) || self.transform.type != ''masquerade''
                       || !has(self.from) || !self.from.self'
-                  - message: SNAT cannot be used with from.self (OUTPUT chain conflicts
-                      with POSTROUTING)
-                    rule: '!has(self.transform) || self.transform.type != ''snat''
-                      || !has(self.from) || !self.from.self'
                   - message: DNAT requires transform.target to be specified
                     rule: '!has(self.transform) || self.transform.type != ''dnat''
-                      || has(self.transform.target)'
-                  - message: SNAT requires transform.target to be specified
-                    rule: '!has(self.transform) || self.transform.type != ''snat''
                       || has(self.transform.target)'
                   - message: Masquerade requires transform.interface or to.interfaces[0]
                     rule: '!has(self.transform) || self.transform.type != ''masquerade''
@@ -1003,7 +1007,7 @@ spec:
                       description: |-
                         NATChain indicates which NAT chain processes this flow:
                         - "prerouting": DNAT operations (before routing decision)
-                        - "postrouting": SNAT/Masquerade operations (after routing decision)
+                        - "postrouting": Masquerade operations (after routing decision)
                         - Empty if no NAT transformation is configured
                       type: string
                   required:
