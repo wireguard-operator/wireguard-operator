@@ -51,7 +51,13 @@ var _ = Describe("WireGuardTrafficFlow Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: wireguardoperatoriov1alpha1.WireGuardTrafficFlowSpec{
+						WireGuardReferenceSpec: wireguardoperatoriov1alpha1.WireGuardReferenceSpec{
+							WireGuardRef: wireguardoperatoriov1alpha1.WireGuardRef{
+								Name: "dummy",
+							},
+						},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

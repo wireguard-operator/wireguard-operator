@@ -1,0 +1,221 @@
+should match snapshot:
+  1: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: wireguard-operator
+        app.kubernetes.io/version: v0.0.0
+        helm.sh/chart: wireguard-operator-0.0.0
+      name: RELEASE-NAME-wireguard-operator-manager-role
+    rules:
+      - apiGroups:
+          - ""
+        resources:
+          - events
+        verbs:
+          - create
+          - patch
+      - apiGroups:
+          - ""
+        resources:
+          - secrets
+          - serviceaccounts
+          - services
+        verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+      - apiGroups:
+          - apps
+        resources:
+          - deployments
+        verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+      - apiGroups:
+          - rbac.authorization.k8s.io
+        resources:
+          - clusterrolebindings
+          - clusterroles
+          - rolebindings
+          - roles
+        verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+      - apiGroups:
+          - wireguard-operator.io
+        resources:
+          - wireguardpeers
+        verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+      - apiGroups:
+          - wireguard-operator.io
+        resources:
+          - wireguardpeers/finalizers
+        verbs:
+          - update
+      - apiGroups:
+          - wireguard-operator.io
+        resources:
+          - wireguardpeers/status
+        verbs:
+          - get
+          - patch
+          - update
+      - apiGroups:
+          - wireguard-operator.io
+        resources:
+          - wireguards
+        verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+      - apiGroups:
+          - wireguard-operator.io
+        resources:
+          - wireguards/finalizers
+        verbs:
+          - update
+      - apiGroups:
+          - wireguard-operator.io
+        resources:
+          - wireguards/status
+        verbs:
+          - get
+          - patch
+          - update
+      - apiGroups:
+          - wireguard-operator.io
+        resources:
+          - wireguardtrafficflows
+        verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+      - apiGroups:
+          - wireguard-operator.io
+        resources:
+          - wireguardtrafficflows/finalizers
+        verbs:
+          - update
+      - apiGroups:
+          - wireguard-operator.io
+        resources:
+          - wireguardtrafficflows/status
+        verbs:
+          - get
+          - patch
+          - update
+  2: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: wireguard-operator
+        app.kubernetes.io/version: v0.0.0
+        helm.sh/chart: wireguard-operator-0.0.0
+      name: RELEASE-NAME-wireguard-operator-manager-rolebinding
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: RELEASE-NAME-wireguard-operator-manager-role
+    subjects:
+      - kind: ServiceAccount
+        name: RELEASE-NAME-wireguard-operator
+        namespace: NAMESPACE
+  3: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: wireguard-operator
+        app.kubernetes.io/version: v0.0.0
+        helm.sh/chart: wireguard-operator-0.0.0
+      name: RELEASE-NAME-wireguard-operator-leader-election-rolebinding
+      namespace: NAMESPACE
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: Role
+      name: RELEASE-NAME-wireguard-operator-leader-election-role
+    subjects:
+      - kind: ServiceAccount
+        name: RELEASE-NAME-wireguard-operator
+        namespace: NAMESPACE
+  4: |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: wireguard-operator
+        app.kubernetes.io/version: v0.0.0
+        helm.sh/chart: wireguard-operator-0.0.0
+      name: RELEASE-NAME-wireguard-operator-leader-election-role
+    rules:
+      - apiGroups:
+          - ""
+        resources:
+          - configmaps
+        verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+      - apiGroups:
+          - coordination.k8s.io
+        resources:
+          - leases
+        verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+      - apiGroups:
+          - ""
+        resources:
+          - events
+        verbs:
+          - create
+          - patch

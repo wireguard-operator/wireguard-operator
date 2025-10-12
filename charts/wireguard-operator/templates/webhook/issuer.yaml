@@ -1,0 +1,10 @@
+{{- if and .Values.admissionWebhooks.enabled .Values.admissionWebhooks.certManager.enabled  (not .Values.admissionWebhooks.certManager.issuer)}}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "wireguard-operator.fullname" . }}-self-signed-issuer
+  labels:
+    {{- include "wireguard-operator.labels" . | nindent 4 }}
+spec:
+  selfSigned: { }
+{{- end }}

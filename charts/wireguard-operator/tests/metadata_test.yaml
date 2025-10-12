@@ -1,0 +1,32 @@
+suite: All resources contains metadata
+templates:
+  - "*.yaml"
+excludeTemplates:
+  - templates/extra-objects.yaml
+release:
+  name: wgo
+chart:
+  version: "9.8.7"
+  appVersion: "7.8.9"
+set:
+  admissionWebhooks:
+    certManager:
+      enabled: true
+  serviceMonitor:
+    enabled: true
+
+tests:
+  - it: "should contain labels metadata in each template"
+    asserts:
+      - exists:
+          path: metadata.labels
+      - isNotEmpty:
+          path: metadata.labels
+      - equal:
+          path: metadata.labels
+          value:
+            app.kubernetes.io/instance: wgo
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: wireguard-operator
+            app.kubernetes.io/version: 7.8.9
+            helm.sh/chart: wireguard-operator-9.8.7

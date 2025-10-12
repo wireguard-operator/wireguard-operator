@@ -1,0 +1,47 @@
+{{- if .Values.admissionWebhooks.enabled }}
+{{- $fullName := include "wireguard-operator.fullname" . }}
+{{- $ns := .Release.Namespace }}
+{{- $certManager := .Values.admissionWebhooks.certManager }}
+{{- $crds := regexSplit "(?m)^---([\n]|[\r\n])*$" (.Files.Get "crd.yaml") -1 }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ $fullName }}-validating-webhook-configuration
+  {{- if $certManager.enabled }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ printf "%s/%s-serving-cert" $ns $fullName }}
+  {{- end }}
+  labels:
+    {{- include "wireguard-operator.labels" . | nindent 4 }}
+webhooks:
+{{- range $crds }}
+{{- if . }}
+{{- $crd := fromYaml . }}
+{{- $name := $crd.spec.names.singular }}
+{{- range $version := $crd.spec.versions }}
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: {{ $fullName }}
+        namespace: {{ $ns }}
+        port: 9443
+        path: {{ printf "/validate-%s-%s-%s" ($crd.spec.group | replace "." "-") $version.name $name }}
+    failurePolicy: {{ $.Values.admissionWebhooks.policy }}
+    name: {{ printf "v%s-%s.kb.io" $name $version.name }}
+    rules:
+      - apiGroups:
+          - {{ $crd.spec.group }}
+        apiVersions:
+          - {{ $version.name }}
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - {{ $crd.spec.names.plural }}
+    sideEffects: None
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

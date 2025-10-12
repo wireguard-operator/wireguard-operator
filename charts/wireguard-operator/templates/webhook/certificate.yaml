@@ -1,0 +1,21 @@
+{{- if and .Values.admissionWebhooks.enabled .Values.admissionWebhooks.certManager.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "wireguard-operator.fullname" . }}-serving-cert
+  labels:
+    {{- include "wireguard-operator.labels" . | nindent 4 }}
+spec:
+  dnsNames:
+    - {{ include "wireguard-operator.fullname" . }}.{{ .Release.Namespace }}.svc
+    - {{ include "wireguard-operator.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.global.cluster.dnsDomain }}
+  issuerRef:
+  {{- if (not .Values.admissionWebhooks.certManager.issuer) }}
+    kind: Issuer
+    name: {{ include "wireguard-operator.fullname" . }}-self-signed-issuer
+  {{- else  }}
+    {{- tpl (toYaml .Values.admissionWebhooks.certManager.issuer) . | nindent 4 }}
+  {{- end }}
+  secretName: {{ include "wireguard-operator.fullname" . }}-webhook-server-cert
+  duration: 175200s
+{{- end }}

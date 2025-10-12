@@ -1,0 +1,70 @@
+should render deployment:
+  1: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      labels:
+        app.kubernetes.io/instance: RELEASE-NAME
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: wireguard-operator
+        app.kubernetes.io/version: v0.0.0
+        helm.sh/chart: wireguard-operator-0.0.0
+      name: RELEASE-NAME-wireguard-operator
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app.kubernetes.io/instance: RELEASE-NAME
+          app.kubernetes.io/name: wireguard-operator
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/instance: RELEASE-NAME
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: wireguard-operator
+            app.kubernetes.io/version: v0.0.0
+            helm.sh/chart: wireguard-operator-0.0.0
+        spec:
+          containers:
+            - args:
+                - operator
+                - --leader-elect
+                - --metrics-bind-address=:8080
+                - --health-probe-bind-address=:8081
+              image: ghcr.io/wireguard-operator/operator:v0.0.0
+              imagePullPolicy: IfNotPresent
+              livenessProbe:
+                httpGet:
+                  path: /healthz
+                  port: 8081
+              name: wireguard-operator
+              ports:
+                - containerPort: 9443
+                  name: webhook-server
+                  protocol: TCP
+              readinessProbe:
+                httpGet:
+                  path: /readyz
+                  port: 8081
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - mountPath: /tmp/k8s-webhook-server/serving-certs
+                  name: webhook-cert
+                  readOnly: true
+          securityContext:
+            fsGroup: 65534
+            runAsGroup: 65534
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          serviceAccountName: RELEASE-NAME-wireguard-operator
+          volumes:
+            - name: webhook-cert
+              secret:
+                secretName: RELEASE-NAME-wireguard-operator-webhook-server-cert

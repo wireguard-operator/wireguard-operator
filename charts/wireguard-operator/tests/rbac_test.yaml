@@ -1,0 +1,18 @@
+suite: RBAC configuration
+templates:
+  - rbac/cr.yaml
+  - rbac/crb.yaml
+  - rbac/leader-election-rb.yaml
+  - rbac/leader-election-role.yaml
+tests:
+  - it: should match snapshot
+    asserts:
+      - matchSnapshot: { }
+
+  - it: should provide a way to disable rbac
+    set:
+      rbac:
+        create: false
+    asserts:
+      - hasDocuments:
+          count: 0

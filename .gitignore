@@ -25,3 +25,6 @@ go.work
 *.swp
 *.swo
 *~
+
+
+charts/wireguard-operator/crd.yaml

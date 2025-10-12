@@ -1,0 +1,21 @@
+suite: Deployment configuration
+templates:
+  - deployment.yaml
+tests:
+  - it: should render deployment
+    asserts:
+      - matchSnapshot: {}
+
+  - it: should render deployment
+    set:
+      extraArgs:
+        - --dummy
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name == "wireguard-operator")].args
+          value:
+            - operator
+            - --leader-elect
+            - --metrics-bind-address=:8080
+            - --health-probe-bind-address=:8081
+            - --dummy
