@@ -14,6 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package version provides versioning information for the application, including
+// semantic version, git commit, branch, build time, platform, and Go version.
+// It is typically used to embed build and version metadata into the binary and
+// to retrieve this information at runtime.
 package version
 
 import (
