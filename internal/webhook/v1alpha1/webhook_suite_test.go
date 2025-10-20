@@ -40,7 +40,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	wireguardoperatoriov1alpha1 "github.com/wireguard-operator/wireguard-operator/api/v1alpha1"
-	// +kubebuilder:scaffold:imports
+	"github.com/wireguard-operator/wireguard-operator/internal/indexer"
+	testutils "github.com/wireguard-operator/wireguard-operator/test/utils"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -72,12 +73,12 @@ var _ = BeforeSuite(func() {
 	// +kubebuilder:scaffold:scheme
 
 	By("bootstrapping test environment")
-	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
-		ErrorIfCRDPathMissing: false,
 
+	testEnv = &envtest.Environment{
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "manifests")},
+		ErrorIfCRDPathMissing: true,
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
-			Paths: []string{filepath.Join("..", "..", "..", "config", "webhook")},
+			ValidatingWebhooks: testutils.GetValidatingWebHook(),
 		},
 	}
 
@@ -90,10 +91,6 @@ var _ = BeforeSuite(func() {
 	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
-
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	Expect(err).NotTo(HaveOccurred())
-	Expect(k8sClient).NotTo(BeNil())
 
 	// start webhook server using Manager.
 	webhookInstallOptions := &testEnv.WebhookInstallOptions
@@ -108,6 +105,13 @@ var _ = BeforeSuite(func() {
 		Metrics:        metricsserver.Options{BindAddress: "0"},
 	})
 	Expect(err).NotTo(HaveOccurred())
+
+	// Setup field indexers
+	err = indexer.SetupFieldIndexers(ctx, mgr)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Use manager's client which has the field indexers registered
+	k8sClient = mgr.GetClient()
 
 	err = SetupWireGuardWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())

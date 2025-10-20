@@ -5,6 +5,8 @@ go 1.24.0
 require (
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.36.1
+	github.com/seancfoley/ipaddress-go v1.7.1
+	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20241231184526-a9ab2273dd10
 	k8s.io/api v0.33.0
 	k8s.io/apimachinery v0.33.0
 	k8s.io/client-go v0.33.0
@@ -51,6 +53,7 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/seancfoley/bintree v1.3.1 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
@@ -66,6 +69,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.4.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
+	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect

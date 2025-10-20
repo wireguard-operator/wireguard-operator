@@ -56,9 +56,7 @@ type WireGuardTrafficFlowSpec struct {
 // +kubebuilder:validation:XValidation:rule="!has(self.filter) || !has(self.filter.rateLimit) || self.filter.action == 'Allow'",message="rateLimit is only supported with filter.action=Allow"
 // +kubebuilder:validation:XValidation:rule="!has(self.transform) || self.transform.type != 'dnat' || (!has(self.to) || !self.to.self) && (!has(self.from) || !self.from.self)",message="DNAT cannot be used with to.self or from.self (DNAT happens in PREROUTING before routing decision)"
 // +kubebuilder:validation:XValidation:rule="!has(self.transform) || self.transform.type != 'masquerade' || !has(self.from) || !self.from.self",message="Masquerade cannot be used with from.self (OUTPUT chain conflicts with POSTROUTING)"
-// +kubebuilder:validation:XValidation:rule="!has(self.transform) || self.transform.type != 'snat' || !has(self.from) || !self.from.self",message="SNAT cannot be used with from.self (OUTPUT chain conflicts with POSTROUTING)"
 // +kubebuilder:validation:XValidation:rule="!has(self.transform) || self.transform.type != 'dnat' || has(self.transform.target)",message="DNAT requires transform.target to be specified"
-// +kubebuilder:validation:XValidation:rule="!has(self.transform) || self.transform.type != 'snat' || has(self.transform.target)",message="SNAT requires transform.target to be specified"
 // +kubebuilder:validation:XValidation:rule="!has(self.transform) || self.transform.type != 'masquerade' || has(self.transform.interface) || (has(self.to) && has(self.to.interfaces) && self.to.interfaces.size() > 0)",message="Masquerade requires transform.interface or to.interfaces[0]"
 
 // FlowRule defines a single traffic flow with source, destination, filtering, and optional NAT.
@@ -120,15 +118,15 @@ type FlowRule struct {
 	// +optional
 
 	// Transform defines optional NAT transformation for this flow.
-	// Supports masquerading, SNAT, and DNAT operations.
+	// Supports masquerading and DNAT operations.
 	// NAT is applied in addition to filtering, not instead of.
 	// Transform type determines the NAT chain automatically:
-	// - masquerade/snat → POSTROUTING chain
+	// - masquerade → POSTROUTING chain
 	// - dnat → PREROUTING chain
 	//
 	// For masquerade, the interface is used as:
 	// 1. Match condition: oifname "eth0" (packets going out via eth0)
-	// 2. IP source: Masquerade uses eth0's IP for SNAT automatically
+	// 2. IP source: Masquerade uses eth0's IP automatically
 	//
 	// Example: from.ipBlocks=["10.0.0.0/8"] to.interfaces=["eth0"] transform.type=masquerade
 	// Generates NFTables rule: ip saddr 10.0.0.0/8 oifname "eth0" masquerade
@@ -172,7 +170,7 @@ type FlowTrafficSelector struct {
 	// Supports CIDR notation, IP ranges, and single IPs for both IPv4 and IPv6.
 	// Examples: ["10.0.0.0/8", "192.168.1.0/24", "2001:db8::/32"]
 	// Mutually exclusive with podSelector, peerSelector, serviceSelector when self=true.
-	IPBlocks IPNets `json:"ipBlocks,omitempty"`
+	IPBlocks IPBlocks `json:"ipBlocks,omitempty"`
 
 	// +optional
 
@@ -279,21 +277,16 @@ type FilterAction struct {
 	RateLimit *RateLimitSpec `json:"rateLimit,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=masquerade;snat;dnat
+// +kubebuilder:validation:Enum=masquerade;dnat
 
 // TransformType defines the type of NAT transformation.
 type TransformType string
 
 const (
-	// TransformTypeMasquerade dynamically uses the outgoing interface's IP as source (SNAT variant).
+	// TransformTypeMasquerade dynamically uses the outgoing interface's IP as source.
 	// Common for providing internet access to private networks.
 	// Maps to POSTROUTING chain in NFTables.
 	TransformTypeMasquerade TransformType = "masquerade"
-
-	// TransformTypeSNAT replaces source IP with a specific static IP address.
-	// Useful when consistent outbound IP is required (e.g., for firewall allowlists).
-	// Maps to POSTROUTING chain in NFTables.
-	TransformTypeSNAT TransformType = "snat"
 
 	// TransformTypeDNAT changes destination IP/port for incoming packets (port forwarding).
 	// Used for exposing internal services through WireGuard.
@@ -303,15 +296,14 @@ const (
 
 // TransformAction defines NAT transformation for a flow.
 // The transform type automatically determines the NFTables chain:
-// - masquerade/snat → POSTROUTING (after routing decision, before egress)
+// - masquerade → POSTROUTING (after routing decision, before egress)
 // - dnat → PREROUTING (before routing decision, for incoming traffic)
 type TransformAction struct {
 	// +kubebuilder:validation:Required
 
 	// Type specifies the NAT operation mode.
 	// This determines which NFTables NAT chain is used:
-	// - masquerade: POSTROUTING chain, dynamic SNAT using interface IP
-	// - snat: POSTROUTING chain, static SNAT to specific IP
+	// - masquerade: POSTROUTING chain, dynamic source NAT using interface IP
 	// - dnat: PREROUTING chain, destination NAT for port forwarding
 	Type TransformType `json:"type"`
 
@@ -321,23 +313,22 @@ type TransformAction struct {
 	// Target specifies the NAT target address.
 	// Format depends on transform type:
 	// - DNAT: "IP:Port" (e.g., "10.0.0.5:80" for port forwarding to internal service)
-	// - SNAT: "IP" (e.g., "203.0.113.1" for static outbound IP)
 	// - Masquerade: Not used (masquerade uses the matched output interface's IP automatically)
 	//
-	// Required for DNAT and SNAT, ignored for masquerade.
+	// Required for DNAT, ignored for masquerade.
 	Target string `json:"target,omitempty"`
 
 	// +optional
 
 	// Interface specifies the output interface for NAT operations.
-	// Used for masquerade and optionally for SNAT/DNAT.
+	// Used for masquerade and optionally for DNAT.
 	//
 	// For masquerade:
 	// - Required (explicit or from to.interfaces[0])
 	// - Used as match condition (oifname) before masquerade action
-	// - Masquerade automatically uses this interface's IP for SNAT
+	// - Masquerade automatically uses this interface's IP for source NAT
 	//
-	// For SNAT/DNAT:
+	// For DNAT:
 	// - Optional: Can be used to restrict NAT to specific interface
 	//
 	// Resolution order for masquerade:
@@ -394,7 +385,7 @@ type ChainAssignment struct {
 
 	// NATChain indicates which NAT chain processes this flow:
 	// - "prerouting": DNAT operations (before routing decision)
-	// - "postrouting": SNAT/Masquerade operations (after routing decision)
+	// - "postrouting": Masquerade operations (after routing decision)
 	// - Empty if no NAT transformation is configured
 	NATChain string `json:"natChain,omitempty"`
 }

@@ -23,6 +23,9 @@ import (
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2" // nolint:revive,staticcheck
+	admissionv1 "k8s.io/api/admissionregistration/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -197,4 +200,47 @@ func GetProjectDir() (string, error) {
 	}
 	wd = strings.ReplaceAll(wd, "/test/e2e", "")
 	return wd, nil
+}
+
+func makeWebhook(name string) admissionv1.ValidatingWebhook {
+	return admissionv1.ValidatingWebhook{
+		Name:                    fmt.Sprintf("v%s-vwireguardpeer-v1alpha1.kb.io", name),
+		AdmissionReviewVersions: []string{"v1"},
+		ClientConfig: admissionv1.WebhookClientConfig{
+			Service: &admissionv1.ServiceReference{
+				Name:      "webhook-service",
+				Namespace: "system",
+				Port:      ptr.To(int32(9443)),
+				Path:      ptr.To(fmt.Sprintf("/validate-wireguard-operator-io-v1alpha1-%s", name)),
+			},
+		},
+		FailurePolicy: ptr.To(admissionv1.Fail),
+		Rules: []admissionv1.RuleWithOperations{
+			{
+				Operations: []admissionv1.OperationType{
+					admissionv1.Create,
+					admissionv1.Update,
+				},
+				Rule: admissionv1.Rule{
+					APIGroups:   []string{"wireguard-operator.io"},
+					APIVersions: []string{"v1alpha1"},
+					Resources:   []string{fmt.Sprintf("%ss", name)},
+				},
+			},
+		},
+		SideEffects: ptr.To(admissionv1.SideEffectClassNone),
+	}
+}
+
+func GetValidatingWebHook() []*admissionv1.ValidatingWebhookConfiguration {
+	return []*admissionv1.ValidatingWebhookConfiguration{{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "validating-webhook-configuration",
+		},
+		Webhooks: []admissionv1.ValidatingWebhook{
+			makeWebhook("vwireguardpeer"),
+			makeWebhook("wireguard"),
+			makeWebhook("wireguardtrafficflow"),
+		},
+	}}
 }

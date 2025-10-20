@@ -44,7 +44,7 @@ type WireGuardPeerSpec struct {
 	// Examples: ["10.0.1.2/32"] for single host, ["10.0.2.0/24"] for subnet.
 	// For site-to-site: Use the remote site's network ranges.
 	// For road warriors: Typically a single /32 address per peer (auto-assigned if omitted).
-	AllowedIPs IPNets `json:"allowedIPs,omitempty"`
+	AllowedIPs IPBlocks `json:"allowedIPs,omitempty"`
 
 	// +optional
 
@@ -109,7 +109,7 @@ type WireGuardPeerSpec struct {
 	// - Client-side routing for split tunneling
 	// - Including default route (0.0.0.0/0) for full tunnel configs
 	// - Adding routes the client needs but server doesn't route
-	ConfigAllowedIPs IPNets `json:"configAllowedIPs,omitempty"`
+	ConfigAllowedIPs IPBlocks `json:"configAllowedIPs,omitempty"`
 
 	// +optional
 	// +kubebuilder:default=false
